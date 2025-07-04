@@ -1,0 +1,41 @@
+name: Build and Push PHP App to Artifactory
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    env:
+      ARTIFACTORY_URL: ${{ secrets.ARTIFACTORY_URL }}
+      ARTIFACTORY_USER: ${{ secrets.ARTIFACTORY_USER }}
+      ARTIFACTORY_TOKEN: ${{ secrets.ARTIFACTORY_TOKEN }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+
+      - name: Install dependencies (Composer)
+        run: composer install --no-interaction --no-progress --optimize-autoloader
+
+      - name: Run tests
+        run: vendor/bin/phpunit
+
+      - name: Package app
+        run: |
+          mkdir -p build
+          zip -r build/php-app.zip . -x "vendor/*" "build/*" ".git/*" # Exclude some dirs/files
+
+      - name: Upload package to Artifactory
+        run: |
+          curl -u "${ARTIFACTORY_USER}:${ARTIFACTORY_TOKEN}" \
+            -T build/php-app.zip \
+            "${ARTIFACTORY_URL}/my-php-app/php-app-$(date +'%Y%m%d%H%M%S').zip"
